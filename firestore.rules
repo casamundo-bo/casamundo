@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Regla base: solo usuarios autenticados pueden leer/escribir
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Reglas específicas para la colección "debts"
+    match /debts/{debtId} {
+      // Permitir lectura si el usuario está autenticado
+      allow read: if request.auth != null;
+      
+      // Permitir creación si el usuario está autenticado y el userId coincide con el uid del usuario
+      allow create: if request.auth != null && 
+                     request.resource.data.userId == request.auth.uid;
+      
+      // Permitir actualización si el usuario está autenticado y es el propietario de la deuda
+      // O si es un administrador (verificando si está en la colección de admins)
+      allow update: if request.auth != null && 
+                     (resource.data.userId == request.auth.uid || 
+                      exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+      
+      // Permitir eliminación solo a administradores
+      allow delete: if request.auth != null && 
+                     exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    
+    // Reglas para la colección de órdenes
+    match /orders/{orderId} {
+      allow read: if request.auth != null && 
+                   (resource.data.userId == request.auth.uid || 
+                    exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+      
+      allow create: if request.auth != null && 
+                     request.resource.data.userId == request.auth.uid;
+      
+      allow update: if request.auth != null && 
+                     (resource.data.userId == request.auth.uid || 
+                      exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+      
+      allow delete: if request.auth != null && 
+                     exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+  }
+}

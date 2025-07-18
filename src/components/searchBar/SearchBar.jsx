@@ -46,7 +46,11 @@ const SearchBar = () => {
                         :
                         <>
                             <div className="flex justify-center">
-                                <img className=" w-20" src="https://cdn-icons-png.flaticon.com/128/10437/10437090.png" alt="img" />
+                                <img 
+                                    className="w-20" 
+                                    src="https://cdn-icons-png.flaticon.com/128/10437/10437090.png" 
+                                    alt="img" 
+                                />
                             </div>
                         </>}
                 </div>

@@ -2,169 +2,217 @@ import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
 import ProductDetail from '../../components/admin/ProductDetail';
 import OrderDetail from '../../components/admin/OrderDetail';
 import UserDetail from '../../components/admin/UserDetail';
-import { useContext } from 'react';
+import AnalyticsDetail from '../../components/admin/AnalyticsDetail';
+import DebtDetail from '../../components/admin/DebtDetail';
+import React, { useContext, useState, useEffect, useRef } from 'react';
 import myContext from '../../context/myContext';
+import 'react-tabs/style/react-tabs.css';
+import { Link, useNavigate } from 'react-router-dom';
+import FirebaseUsageMonitor from '../../components/firebase/FirebaseUsageMonitor';
+import Layout from '../../components/layout/Layout';
+import AdminSidebar from '../../components/admin/AdminSidebar';
+import Loader from '../../components/loader/Loader';
+// Eliminar importaciones de componentes de depuración
+// import OrderStatusDebug from '../../components/debug/OrderStatusDebug';
+// import OrderDebugHelper from '../../components/debug/OrderDebugHelper';
+// import OrdersDebugViewer from '../../components/debug/OrdersDebugViewer';
+// import OrderLoadingHelper from '../../components/debug/OrderLoadingHelper';
 
 const AdminDashboard = () => {
     const user = JSON.parse(localStorage.getItem('users'));
+    const isAdmin = user?.role === 'admin';
+    const isOperator = user?.role === 'operator';
+    
     const context = useContext(myContext);
-    const {getAllProduct, getAllOrder, getAllUser} = context;
+    const { 
+        loading, 
+        getAllProduct, 
+        getAllOrder, 
+        getAllUser,
+        getAllDebts,
+        getAllProductFunction, 
+        getAllOrderFunction, 
+        getAllUserFunction,
+        getAllDebtsFunction
+    } = context;
+    
+    const [searchTerm, setSearchTerm] = useState('');
+    const navigate = useNavigate();
+    
+    // Add state to manage the selected tab
+    const [tabIndex, setTabIndex] = useState(0);
+    const [localLoading, setLocalLoading] = useState(true);
+    
+    // Create the ref at the top level of the component, not inside useEffect
+    const isFirstLoad = useRef(true);
+    const ordersLoaded = useRef(false);
+    const productsLoaded = useRef(false);
+    const usersLoaded = useRef(false);
+    
+    // Cargar datos cuando el componente se monta
+    useEffect(() => {
+        // Modificar la función loadInitialData (alrededor de la línea 52)
+        const loadInitialData = async () => {
+            setLocalLoading(true);
+            
+            try {
+                // Cargar productos si es necesario
+                if (!productsLoaded.current && getAllProduct.length === 0) {
+                    await getAllProductFunction();
+                    productsLoaded.current = true;
+                }
+                
+                // Cargar órdenes si es necesario
+                if (!ordersLoaded.current && getAllOrder.length === 0) {
+                    await getAllOrderFunction();
+                    ordersLoaded.current = true;
+                }
+                
+                // Cargar usuarios si es necesario
+                if (!usersLoaded.current && getAllUser.length === 0) {
+                    await getAllUserFunction();
+                    usersLoaded.current = true;
+                }
+                
+                // Cargar deudas
+                await getAllDebtsFunction();
+                
+            } catch (error) {
+                console.error("Error cargando datos iniciales:", error);
+            } finally {
+                setLocalLoading(false);
+                isFirstLoad.current = false;
+            }
+        };
+        
+        loadInitialData();
+    }, [getAllProductFunction, getAllUserFunction, isAdmin]);
+
+    // Add a separate effect to load orders when tab changes to Orders tab
+    useEffect(() => {
+        const loadOrdersForTab = async () => {
+            if (tabIndex === 1) {
+                if (!ordersLoaded.current && typeof getAllOrderFunction === 'function') {
+                    console.log("AdminDashboard: Cargando órdenes al cambiar a pestaña de pedidos...");
+                    try {
+                        await getAllOrderFunction();
+                        ordersLoaded.current = true;
+                    } catch (error) {
+                        console.error("Error loading orders:", error);
+                    }
+                }
+            }
+        };
+        
+        loadOrdersForTab();
+    }, [tabIndex, getAllOrderFunction]);
+
+    // Function to handle tab selection
+    const handleTabSelect = (index) => {
+        console.log(`Changing tab to index ${index}`);
+        setTabIndex(index);
+    };
+
     return (
-        <div>
-            {/* Top */}
-            <div className="top mb-5 px-5 mt-5">
-                <div className=" bg-pink-50 py-5 border border-pink-100 rounded-lg">
-                    <h1 className=" text-center text-2xl font-bold text-pink-500">Administrador Dashboard</h1>
-                </div>
-            </div>
-
-            <div className="px-5">
-                {/* Mid  */}
-                <div className="mid mb-5">
-                    {/* main  */}
-                    <div className=" bg-pink-50 py-5 rounded-xl border border-pink-100">
-                        {/* image  */}
-                        <div className="flex justify-center">
-                            <img src="https://cdn-icons-png.flaticon.com/128/2202/2202112.png" alt="" />
-                        </div>
-                        {/* text  */}
-                           <div className="">
-                            {/* Name  */}
-                            <h1 className=" text-center text-lg">
-                                <span className=" font-bold">Nombre : </span>
-                                {user?.name}
-                            </h1>
-
-                            {/* Email  */}
-                            <h1 className=" text-center text-lg">
-                                <span className=" font-bold">Email : </span>
-                                {user?.email}
-                            </h1>
-
-                            {/* Date  */}
-                            <h1 className=" text-center text-lg">
-                                <span className=" font-bold">Fecha : </span>
-                                {user?.date}
-                            </h1>
-
-                            {/* Role  */}
-                            <h1 className=" text-center text-lg">
-                                <span className=" font-bold">Rol : </span>
-                                {user?.role}
-                            </h1>
-                        </div>
+        <Layout>
+            <div className="container mx-auto px-4 py-8">
+                {/* Componentes de depuración comentados
+                <OrderStatusDebug />
+                <OrderDebugHelper />
+                <OrdersDebugViewer />
+                <OrderLoadingHelper />
+                */}
+                
+                <div className="flex flex-col md:flex-row gap-6">
+                    {/* Sidebar */}
+                    <AdminSidebar />
+                    
+                    {/* Main content */}
+                    <div className="flex-1">
+                        <h1 className="text-2xl font-bold mb-6">Panel de Administración</h1>
+                        
+                        {localLoading ? (
+                            <div className="flex justify-center items-center h-64">
+                                <Loader />
+                            </div>
+                        ) : (
+                            <>
+                                {/* Stats Cards */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                                    <div className="bg-pink-50 p-6 rounded-lg shadow-md">
+                                        <h2 className="text-lg font-semibold mb-2">Productos</h2>
+                                        <p className="text-3xl font-bold">{Array.isArray(getAllProduct) ? getAllProduct.length : 0}</p>
+                                    </div>
+                                    
+                                    <div className="bg-pink-50 p-6 rounded-lg shadow-md">
+                                        <h2 className="text-lg font-semibold mb-2">Pedidos</h2>
+                                        <p className="text-3xl font-bold">{Array.isArray(getAllOrder) ? getAllOrder.length : 0}</p>
+                                    </div>
+                                    
+                                    {isAdmin && (
+                                        <div className="bg-pink-50 p-6 rounded-lg shadow-md">
+                                            <h2 className="text-lg font-semibold mb-2">Usuarios</h2>
+                                            <p className="text-3xl font-bold">{Array.isArray(getAllUser) ? getAllUser.length : 0}</p>
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                {/* Tabs - Add onSelect handler and selectedIndex */}
+                                <Tabs selectedIndex={tabIndex} onSelect={handleTabSelect}>
+                                    <TabList className="flex border-b mb-4">
+                                        <Tab className="px-4 py-2 border-b-2 border-transparent hover:border-pink-500 focus:outline-none cursor-pointer">
+                                            Productos
+                                        </Tab>
+                                        <Tab className="px-4 py-2 border-b-2 border-transparent hover:border-pink-500 focus:outline-none cursor-pointer">
+                                            Pedidos
+                                        </Tab>
+                                        {isAdmin && (
+                                            <Tab className="px-4 py-2 border-b-2 border-transparent hover:border-pink-500 focus:outline-none cursor-pointer">
+                                                Usuarios
+                                            </Tab>
+                                        )}
+                                        {isAdmin && (
+                                            <Tab className="px-4 py-2 border-b-2 border-transparent hover:border-pink-500 focus:outline-none cursor-pointer">
+                                                Analíticas
+                                            </Tab>
+                                        )}
+                                    </TabList>
+                                    
+                                    {/* Products Tab */}
+                                    <TabPanel>
+                                        <ProductDetail />
+                                    </TabPanel>
+                                    
+                                    {/* Orders Tab */}
+                                    <TabPanel>
+                                        {tabIndex === 1 && <OrderDetail />}
+                                        {/* Eliminar el componente de depuración y el comentario */}
+                                    </TabPanel>
+                                    
+                                    {/* Users Tab - Only for Admin */}
+                                    {isAdmin && (
+                                        <TabPanel>
+                                            <UserDetail />
+                                        </TabPanel>
+                                    )}
+                                    
+                                    {/* Analytics Tab - Only for Admin */}
+                                    {isAdmin && (
+                                        <TabPanel>
+                                            <div className="space-y-8">
+                                                <AnalyticsDetail />
+                                                <FirebaseUsageMonitor />
+                                            </div>
+                                        </TabPanel>
+                                    )}
+                                </Tabs>
+                            </>
+                        )}
                     </div>
                 </div>
-
-                {/* Bottom */}
-                <div className="">
-                    <Tabs>
-                        <TabList className="flex flex-wrap -m-4 text-center justify-center">
-                            {/* Total Products */}
-                            <Tab className="p-4 md:w-1/3 sm:w-1/2 w-full cursor-pointer">
-                                <div className=" border bg-pink-50 hover:bg-pink-100 border-pink-100 px-4 py-3 rounded-xl" >
-                                    <div className="text-pink-500 w-12 h-12 mb-3 inline-block" >
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width={50}
-                                            height={50}
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth={2}
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            className="lucide lucide-shopping-basket"
-                                        >
-                                            <path d="m5 11 4-7" />
-                                            <path d="m19 11-4-7" />
-                                            <path d="M2 11h20" />
-                                            <path d="m3.5 11 1.6 7.4a2 2 0 0 0 2 1.6h9.8c.9 0 1.8-.7 2-1.6l1.7-7.4" />
-                                            <path d="m9 11 1 9" />
-                                            <path d="M4.5 15.5h15" />
-                                            <path d="m15 11-1 9" />
-                                        </svg>
-
-                                    </div>
-                                    <h2 className="title-font font-medium text-3xl text-pink-400 fonts1" >{getAllProduct.length}</h2>
-                                    <p className=" text-pink-500  font-bold" >Totos los Productos</p>
-                                </div>
-                            </Tab>
-
-                            {/* Total Order  */}
-                            <Tab className="p-4 md:w-1/4 sm:w-1/2 w-full cursor-pointer">
-                                <div className=" border bg-pink-50 hover:bg-pink-100 border-pink-100 px-4 py-3 rounded-xl" >
-                                    <div className="text-pink-500 w-12 h-12 mb-3 inline-block" >
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width={50}
-                                            height={50}
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth={2}
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            className="lucide lucide-list-ordered"
-                                        >
-                                            <line x1={10} x2={21} y1={6} y2={6} />
-                                            <line x1={10} x2={21} y1={12} y2={12} />
-                                            <line x1={10} x2={21} y1={18} y2={18} />
-                                            <path d="M4 6h1v4" />
-                                            <path d="M4 10h2" />
-                                            <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" />
-                                        </svg>
-                                    </div>
-                                    <h2 className="title-font font-medium text-3xl text-pink-400 fonts1" >{getAllOrder.length}</h2>
-                                    <p className=" text-pink-500  font-bold" >Total Ordenes</p>
-                                </div>
-                            </Tab>
-
-                            {/* Total User  */}
-                            <Tab className="p-4 md:w-1/3 sm:w-1/2 w-full cursor-pointer">
-                                <div className=" border bg-pink-50 hover:bg-pink-100 border-pink-100 px-4 py-3 rounded-xl" >
-                                    <div className="text-pink-500 w-12 h-12 mb-3 inline-block" >
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width={50}
-                                            height={50}
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth={2}
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            className="lucide lucide-users"
-                                        >
-                                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                                            <circle cx={9} cy={7} r={4} />
-                                            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                                            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                                        </svg>
-
-                                    </div>
-                                    <h2 className="title-font font-medium text-3xl text-pink-400 fonts1" >{getAllUser.length}</h2>
-                                    <p className=" text-pink-500  font-bold" >Usuarios</p>
-                                </div>
-                            </Tab>
-                        </TabList>
-
-                        <TabPanel>
-                            <ProductDetail />
-                        </TabPanel>
-
-                        <TabPanel>
-                            <OrderDetail/>
-                        </TabPanel>
-
-                        <TabPanel>
-                           <UserDetail/>
-                        </TabPanel>
-                    </Tabs>
-                </div>
             </div>
-        </div>
+        </Layout>
     );
-}
+};
 
 export default AdminDashboard;

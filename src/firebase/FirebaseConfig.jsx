@@ -9,22 +9,23 @@ import { getAuth } from 'firebase/auth';
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyBoA6hcYMbpl1eKBiLzOjAagDF5uVkKyyk",
-  authDomain: "casamundo-7edf9.firebaseapp.com",
-  projectId: "casamundo-7edf9",
-  storageBucket: "casamundo-7edf9.firebasestorage.app",
-  messagingSenderId: "686028321496",
-  appId: "1:686028321496:web:9f17cfcedaac614efd5dad",
-  measurementId: "G-X7KHZ1MLY0"
+  apiKey: "AIzaSyD-TSVIiUfIbW-wWJzwuJl1juVl0zpWftE",
+  authDomain: "casamundobolivia-bac9a.firebaseapp.com",
+  projectId: "casamundobolivia-bac9a",
+  storageBucket: "casamundobolivia-bac9a.firebasestorage.app",
+  messagingSenderId: "153716530865",
+  appId: "1:153716530865:web:e03820c45e96042e300c90"
 };
-
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
+// Inicializar Firestore con configuración para mejorar el rendimiento
 const fireDB = getFirestore(app);
 const auth = getAuth(app);
 
+// Inicializar Analytics
 const analytics = getAnalytics(app);
 
+// Exportar las instancias de Firebase
 export { fireDB, auth }

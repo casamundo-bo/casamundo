@@ -1,0 +1,1 @@
+import { safeText } from '../../utils/productUtils';

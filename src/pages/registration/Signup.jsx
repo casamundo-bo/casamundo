@@ -15,11 +15,13 @@ const Signup = () => {
     // navigate 
     const navigate = useNavigate();
 
-    // User Signup State 
+    // User Signup State - Adding phone and address fields
     const [userSignup, setUserSignup] = useState({
         name: "",
         email: "",
         password: "",
+        phone: "",     // New field for phone number
+        address: "",   // New field for home address
         role: "user"
     });
 
@@ -28,72 +30,82 @@ const Signup = () => {
     *========================================================================**/
 
     const userSignupFunction = async () => {
-        // validation 
-        if (userSignup.name === "" || userSignup.email === "" || userSignup.password === "") {
+        // validation - Updated to include new fields
+        if (userSignup.name === "" || userSignup.email === "" || userSignup.password === "" || 
+            userSignup.phone === "" || userSignup.address === "") {
             toast.error("Llene todos los campos por favor")
+            return;
         }
 
+        // Phone number validation
+        const phoneRegex = /^\d{7,10}$/;
+        if (!phoneRegex.test(userSignup.phone)) {
+            toast.error("Por favor ingrese un número de teléfono válido (7-10 dígitos)");
+            return;
+        }
+        
         setLoading(true);
+
         try {
             const users = await createUserWithEmailAndPassword(auth, userSignup.email, userSignup.password);
 
-            // create user object
+            // Create user object with new fields
             const user = {
                 name: userSignup.name,
-                email: users.user.email,
                 uid: users.user.uid,
+                email: users.user.email,
+                phone: userSignup.phone,
+                address: userSignup.address,
                 role: userSignup.role,
                 time: Timestamp.now(),
                 date: new Date().toLocaleString(
-                    "en-US",
+                    "es-ES",
                     {
-                        month: "short",
+                        month: "2-digit",
                         day: "2-digit",
                         year: "numeric",
                     }
                 )
             }
 
-            // create user Refrence
-            const userRefrence = collection(fireDB, "user")
-
-            // Add User Detail
-            addDoc(userRefrence, user);
-
+            // Add user to firestore
+            const userRef = collection(fireDB, "user");
+            await addDoc(userRef, user);
+            
+            // Reset form
             setUserSignup({
                 name: "",
                 email: "",
-                password: ""
+                password: "",
+                phone: "",
+                address: "",
+                role: "user"
             })
-
-            toast.success("Signup Successfully");
-
-            setLoading(false);
+            
+            toast.success("Registro exitoso");
             navigate('/login')
-        } catch (error) {
-            console.log(error);
             setLoading(false);
-        }
 
+        } catch (error) {
+            console.error(error);
+            setLoading(false);
+            if (error.code === 'auth/email-already-in-use') {
+                toast.error("El correo electrónico ya está en uso");
+            } else {
+                toast.error("Error al registrar usuario");
+            }
+        }
     }
     return (
         <div className='flex justify-center items-center h-screen'>
-            {loading && <Loader/>}
-            {/* Login Form  */}
-            <div className="login_Form bg-pink-50 px-8 py-6 border border-pink-100 rounded-xl shadow-md">
-
-                {/* Top Heading  */}
-                <div className="mb-5">
-                    <h2 className='text-center text-2xl font-bold text-pink-500 '>
-                        Registro
-                    </h2>
+            {loading && <Loader />}
+            <div className='bg-gray-800 px-10 py-10 rounded-xl'>
+                <div className="">
+                    <h1 className='text-center text-white text-xl mb-4 font-bold'>Registro</h1>
                 </div>
-
-                {/* Input One  */}
-                <div className="mb-3">
-                    <input
-                        type="text"
-                        placeholder='Nombre Completo'
+                <div>
+                    <input type="text"
+                        name='name'
                         value={userSignup.name}
                         onChange={(e) => {
                             setUserSignup({
@@ -101,15 +113,13 @@ const Signup = () => {
                                 name: e.target.value
                             })
                         }}
-                        className='bg-pink-50 border border-pink-200 px-2 py-2 w-96 rounded-md outline-none placeholder-pink-200'
+                        className='bg-gray-600 mb-4 px-2 py-2 w-full lg:w-[400px] rounded-lg text-white placeholder:text-gray-200 outline-none'
+                        placeholder='Nombre'
                     />
                 </div>
-
-                {/* Input Two  */}
-                <div className="mb-3">
-                    <input
-                        type="email"
-                        placeholder='Direccion de Email'
+                <div>
+                    <input type="email"
+                        name='email'
                         value={userSignup.email}
                         onChange={(e) => {
                             setUserSignup({
@@ -117,15 +127,12 @@ const Signup = () => {
                                 email: e.target.value
                             })
                         }}
-                        className='bg-pink-50 border border-pink-200 px-2 py-2 w-96 rounded-md outline-none placeholder-pink-200'
+                        className='bg-gray-600 mb-4 px-2 py-2 w-full lg:w-[400px] rounded-lg text-white placeholder:text-gray-200 outline-none'
+                        placeholder='Correo'
                     />
                 </div>
-
-                {/* Input Three  */}
-                <div className="mb-5">
-                    <input
-                        type="password"
-                        placeholder='Contraseña'
+                <div>
+                    <input type="password"
                         value={userSignup.password}
                         onChange={(e) => {
                             setUserSignup({
@@ -133,28 +140,53 @@ const Signup = () => {
                                 password: e.target.value
                             })
                         }}
-                        className='bg-pink-50 border border-pink-200 px-2 py-2 w-96 rounded-md outline-none placeholder-pink-200'
+                        className='bg-gray-600 mb-4 px-2 py-2 w-full lg:w-[400px] rounded-lg text-white placeholder:text-gray-200 outline-none'
+                        placeholder='Contraseña'
                     />
                 </div>
-
-                {/* Signup Button  */}
-                <div className="mb-5">
+                {/* New phone field */}
+                <div>
+                    <input type="tel"
+                        name='phone'
+                        value={userSignup.phone}
+                        onChange={(e) => {
+                            setUserSignup({
+                                ...userSignup,
+                                phone: e.target.value
+                            })
+                        }}
+                        className='bg-gray-600 mb-4 px-2 py-2 w-full lg:w-[400px] rounded-lg text-white placeholder:text-gray-200 outline-none'
+                        placeholder='Teléfono'
+                    />
+                </div>
+                {/* New address field */}
+                <div>
+                    <input type="text"
+                        name='address'
+                        value={userSignup.address}
+                        onChange={(e) => {
+                            setUserSignup({
+                                ...userSignup,
+                                address: e.target.value
+                            })
+                        }}
+                        className='bg-gray-600 mb-4 px-2 py-2 w-full lg:w-[400px] rounded-lg text-white placeholder:text-gray-200 outline-none'
+                        placeholder='Dirección de casa'
+                    />
+                </div>
+                <div className='flex justify-center mb-3'>
                     <button
-                        type='button'
                         onClick={userSignupFunction}
-                        className='bg-pink-500 hover:bg-pink-600 w-full text-white text-center py-2 font-bold rounded-md '
-                    >
-                        Registrarme
+                        className='bg-red-500 w-full text-white font-bold px-2 py-2 rounded-lg'>
+                        Registrarse
                     </button>
                 </div>
-
                 <div>
-                    <h2 className='text-black'>Tengo una cuenta <Link className=' text-pink-500 font-bold' to={'/login'}>Inicio de Sesión</Link></h2>
+                    <h2 className='text-white'>¿Ya tienes una cuenta? <Link className='text-red-500 font-bold' to={'/login'}>Iniciar Sesión</Link></h2>
                 </div>
-
             </div>
         </div>
-    );
+    )
 }
 
 export default Signup;

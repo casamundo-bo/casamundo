@@ -1,57 +1,32 @@
 import { Timestamp, addDoc, collection } from "firebase/firestore";
-import { useContext, useState } from "react";
+import { useContext, useState, useEffect } from "react";
 import myContext from "../../context/myContext";
 import toast from "react-hot-toast";
 import { fireDB } from "../../firebase/FirebaseConfig";
-import { useNavigate } from "react-router";
+import { useNavigate, Link } from "react-router-dom";
 import Loader from "../../components/loader/Loader";
-
-const categoryList = [
-    {
-        name: 'Endredon Twin'
-    },
-    {
-        name: 'Endredon Queen'
-    },
-    {
-        name: 'Endredon King'
-    },
-    {
-        name: 'Pieza de funda'
-    },
-    {
-        name: 'Savana'
-    },
-
-    {/* AGREGAR MAS PRODUCTOS
-        name: 'PRODUCTO N'
-    },
-    {
-        name: 'PRODUCTO N'
-    },
-    {
-        name: 'PRODUCTO N'
-    */}
-]
+import Layout from "../../components/layout/Layout";
+import { categoryList } from "../../data/categories";
 
 const AddProductPage = () => {
+    console.log("Renderizando AddProductPage");
     const context = useContext(myContext);
+    console.log("Context en AddProductPage:", context);
     const { loading, setLoading } = context;
-
-    // navigate 
     const navigate = useNavigate();
-
-    // product state
+    
     const [product, setProduct] = useState({
         title: "",
         price: "",
-        productImageUrl: "",
+        imageUrl: "",
         category: "",
+        subcategory: "",
         description: "",
-        quantity : 1,
+        stock: 0,
+        hasStockControl: true, // Nuevo campo para controlar si el producto tiene control de stock
         time: Timestamp.now(),
         date: new Date().toLocaleString(
-            "en-US",
+            "es-ES",
             {
                 month: "short",
                 day: "2-digit",
@@ -59,142 +34,221 @@ const AddProductPage = () => {
             }
         )
     });
-
-
-    // Add Product Function
-    const addProductFunction = async () => {
-        if (product.title == "" || product.price == "" || product.productImageUrl == "" || product.category == "" || product.description == "") {
-            return toast.error("Todos los campos son requeridos")
+    
+    // Estado para almacenar las subcategorías disponibles
+    const [availableSubcategories, setAvailableSubcategories] = useState([]);
+    
+    // Actualizar subcategorías cuando cambia la categoría
+    useEffect(() => {
+        if (product.category) {
+            const selectedCategory = categoryList.find(cat => cat.name === product.category);
+            if (selectedCategory && selectedCategory.subcategories) {
+                setAvailableSubcategories(selectedCategory.subcategories);
+                // Resetear la subcategoría cuando cambia la categoría
+                setProduct(prev => ({ ...prev, subcategory: "" }));
+            } else {
+                setAvailableSubcategories([]);
+            }
+        } else {
+            setAvailableSubcategories([]);
         }
-
+    }, [product.category]);
+    
+    const addProduct = async () => {
+        if (
+            product.title === "" || 
+            product.price === "" || 
+            product.imageUrl === "" || 
+            product.category === "" || 
+            product.description === ""
+            // Removemos la validación de stock si no hay control de stock
+        ) {
+            return toast.error("Todos los campos son obligatorios");
+        }
+        
+        // Si no tiene control de stock, establecemos un valor alto por defecto
+        const finalProduct = {...product};
+        if (!finalProduct.hasStockControl) {
+            finalProduct.stock = 999999; // Un número alto para representar "sin límite"
+        } else if (finalProduct.stock === "") {
+            return toast.error("El stock es obligatorio cuando el control de stock está activado");
+        }
+        
         setLoading(true);
+        
         try {
-            const productRef = collection(fireDB, 'products');
-            await addDoc(productRef, product)
-            toast.success("Producto agregado con exito");
-            navigate('/admin-dashboard')
-            setLoading(false)
+            // Ensure consistent case for category and subcategory
+            const productToSave = {
+                ...finalProduct,
+                category: finalProduct.category.toUpperCase(),
+                subcategory: finalProduct.subcategory.toUpperCase()
+            };
+            
+            console.log("Saving product with:", productToSave);
+            
+            const productRef = collection(fireDB, "products");
+            await addDoc(productRef, productToSave);
+            toast.success("Producto añadido correctamente");
+            navigate("/admin-dashboard");
         } catch (error) {
-            console.log(error);
-            setLoading(false)
-            toast.error("Agregado fallido");
+            console.error("Error al añadir producto:", error);
+            toast.error("Error al añadir producto");
+        } finally {
+            setLoading(false);
         }
-
-    }
+    };
+    
     return (
-        <div>
-            <div className='flex justify-center items-center h-screen'>
-                {loading && <Loader />}
-                {/* Login Form  */}
-                <div className="login_Form bg-pink-50 px-8 py-6 border border-pink-100 rounded-xl shadow-md">
-
-                    {/* Top Heading  */}
-                    <div className="mb-5">
-                        <h2 className='text-center text-2xl font-bold text-pink-500 '>
-                            Agregar Producto
-                        </h2>
+        <Layout>
+            <div className="container mx-auto px-4 py-8">
+                <h1 className="text-2xl font-bold mb-6">Añadir Producto</h1>
+                
+                {loading ? (
+                    <Loader />
+                ) : (
+                    <div className="bg-white p-6 rounded-lg shadow-md">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Título */}
+                            <div>
+                                <label className="block text-gray-700 mb-2">Título del Producto</label>
+                                <input
+                                    type="text"
+                                    name="title"
+                                    value={product.title}
+                                    onChange={(e) => setProduct({...product, title: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+                                />
+                            </div>
+                            
+                            {/* Precio */}
+                            <div>
+                                <label className="block text-gray-700 mb-2">Precio</label>
+                                <input
+                                    type="number"
+                                    name="price"
+                                    value={product.price}
+                                    onChange={(e) => setProduct({...product, price: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+                                />
+                            </div>
+                            
+                            {/* URL de Imagen */}
+                            <div>
+                                <label className="block text-gray-700 mb-2">URL de Imagen</label>
+                                <input
+                                    type="text"
+                                    name="imageUrl"
+                                    value={product.imageUrl}
+                                    onChange={(e) => setProduct({...product, imageUrl: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+                                />
+                            </div>
+                            
+                            {/* Categoría */}
+                            <div>
+                                <label className="block text-gray-700 mb-2">Categoría</label>
+                                <select
+                                    name="category"
+                                    value={product.category}
+                                    onChange={(e) => setProduct({...product, category: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+                                >
+                                    <option value="">Seleccionar Categoría</option>
+                                    {categoryList.map((category, index) => (
+                                        <option key={index} value={category.name}>{category.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            
+                            {/* Subcategoría - Nuevo campo */}
+                            <div>
+                                <label className="block text-gray-700 mb-2">Subcategoría</label>
+                                <select
+                                    name="subcategory"
+                                    value={product.subcategory}
+                                    onChange={(e) => setProduct({...product, subcategory: e.target.value})}
+                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+                                    disabled={!product.category || availableSubcategories.length === 0}
+                                >
+                                    <option value="">Seleccionar Subcategoría</option>
+                                    {availableSubcategories.map((subcategory, index) => (
+                                        <option key={index} value={subcategory}>{subcategory}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            
+                            {/* Control de Stock - Reemplazado con el nuevo código */}
+                            <div className="mb-4">
+                                <label className="block text-gray-700 text-sm font-bold mb-2">
+                                    Control de Stock
+                                </label>
+                                <div className="flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={product.hasStockControl}
+                                        onChange={(e) => setProduct({...product, hasStockControl: e.target.checked})}
+                                        className="mr-2 h-5 w-5 text-pink-500"
+                                    />
+                                    <span className="text-gray-700">
+                                        Habilitar control de stock para este producto
+                                    </span>
+                                </div>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    {product.hasStockControl 
+                                        ? "El producto tendrá un límite de stock según la cantidad especificada." 
+                                        : "El producto tendrá stock ilimitado, no se controlará la cantidad disponible."}
+                                </p>
+                            </div>
+                            
+                            {/* Stock - Condicionalmente visible con el nuevo código */}
+                            {product.hasStockControl && (
+                                <div className="mb-4">
+                                    <label className="block text-gray-700 text-sm font-bold mb-2">
+                                        Stock
+                                    </label>
+                                    <input
+                                        value={product.stock}
+                                        onChange={(e) => setProduct({...product, stock: e.target.value})}
+                                        type="number"
+                                        min="0"
+                                        className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                        placeholder="Stock"
+                                        required
+                                    />
+                                </div>
+                            )}
+                            
+                        </div>
+                        
+                        {/* Descripción */}
+                        <div className="mt-6">
+                            <label className="block text-gray-700 mb-2">Descripción</label>
+                            <textarea
+                                name="description"
+                                value={product.description}
+                                onChange={(e) => setProduct({...product, description: e.target.value})}
+                                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+                                rows="4"
+                            ></textarea>
+                        </div>
+                        
+                        {/* Botones */}
+                        <div className="mt-6 flex justify-end space-x-4">
+                            <Link to="/admin-dashboard" className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">
+                                Cancelar
+                            </Link>
+                            <button
+                                onClick={addProduct}
+                                className="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600"
+                            >
+                                Añadir Producto
+                            </button>
+                        </div>
                     </div>
-
-                    {/* Input One  */}
-                    <div className="mb-3">
-                        <input
-                            type="text"
-                            name="title"
-                            value={product.title}
-                            onChange={(e) => {
-                                setProduct({
-                                    ...product,
-                                    title: e.target.value
-                                })
-                            }}
-                            placeholder='Titulo del Producto'
-                            className='bg-pink-50 border text-pink-300 border-pink-200 px-2 py-2 w-96 rounded-md outline-none placeholder-pink-300'
-                        />
-                    </div>
-
-                    {/* Input Two  */}
-                    <div className="mb-3">
-                        <input
-                            type="number"
-                            name="price"
-                            value={product.price}
-                            onChange={(e) => {
-                                setProduct({
-                                    ...product,
-                                    price: e.target.value
-                                })
-                            }}
-                            placeholder='Precio del Producto'
-                            className='bg-pink-50 border text-pink-300 border-pink-200 px-2 py-2 w-96 rounded-md outline-none placeholder-pink-300'
-                        />
-                    </div>
-
-                    {/* Input Three  */}
-                    <div className="mb-3">
-                        <input
-                            type="text"
-                            name="productImageUrl"
-                            value={product.productImageUrl}
-                            onChange={(e) => {
-                                setProduct({
-                                    ...product,
-                                    productImageUrl: e.target.value
-                                })
-                            }}
-                            placeholder='Imagen URL del Producto'
-                            className='bg-pink-50 border text-pink-300 border-pink-200 px-2 py-2 w-96 rounded-md outline-none placeholder-pink-300'
-                        />
-                    </div>
-
-                    {/* Input Four  */}
-                    <div className="mb-3">
-                        <select
-                            value={product.category}
-                            onChange={(e) => {
-                                setProduct({
-                                    ...product,
-                                    category: e.target.value
-                                })
-                            }}
-                            className="w-full px-1 py-2 text-pink-300 bg-pink-50 border border-pink-200 rounded-md outline-none  ">
-                            <option disabled>Seleccionar categoria</option>
-                            {categoryList.map((value, index) => {
-                                const { name } = value
-                                return (
-                                    <option className=" first-letter:uppercase" key={index} value={name}>{name}</option>
-                                )
-                            })}
-                        </select>
-                    </div>
-
-                    {/* Input Five  */}
-                    <div className="mb-3">
-                        <textarea
-                            value={product.description}
-                            onChange={(e) => {
-                                setProduct({
-                                    ...product,
-                                    description: e.target.value
-                                })
-                            }} name="description" placeholder="Descripcion del Producto" rows="5" className=" w-full px-2 py-1 text-pink-300 bg-pink-50 border border-pink-200 rounded-md outline-none placeholder-pink-300 ">
-
-                        </textarea>
-                    </div>
-
-                    {/* Add Product Button  */}
-                    <div className="mb-3">
-                        <button
-                            onClick={addProductFunction}
-                            type='button'
-                            className='bg-pink-500 hover:bg-pink-600 w-full text-white text-center py-2 font-bold rounded-md '
-                        >
-                            Agrefar Producto
-                        </button>
-                    </div>
-                </div>
+                )}
             </div>
-        </div>
+        </Layout>
     );
-}
+};
 
 export default AddProductPage;
